@@ -1,0 +1,19 @@
+name: Build Kernel Feisty
+on:
+  push
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v2
+      with:
+        path: kernel
+    - name: Build With Shell
+      run: |
+        bash kernel/build-cbl.sh
+    - name : Upload artifact
+      uses: actions/upload-artifact@master
+      with:
+        path: kernel/out/arch/arm64/boot/
