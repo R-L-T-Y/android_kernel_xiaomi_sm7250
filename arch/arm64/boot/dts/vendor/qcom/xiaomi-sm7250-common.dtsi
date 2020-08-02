@@ -20,6 +20,7 @@
 #include "dsi-panel-samsung-fhd-ea8076-f1-cmd.dtsi"
 #include "dsi-panel-g7a-37-02-0a-dsc-video.dtsi"
 #include "dsi-panel-g7a-37-02-0b-dsc-video.dtsi"
+#include "dsi-panel-g7a-36-02-0c-dsc-video.dtsi"
 #include "dsi-panel-g7a-42-02-0b-dsc-video.dtsi"
 #include "lito-thermal-overlay.dtsi"
 
@@ -67,7 +68,7 @@
 
 	msm_notifier: qcom,msm_notifier@0 {
 		compatible = "qcom,msm-notifier";
-		panel = <&dsi_g7a_37_02_0a_video &dsi_g7a_37_02_0b_video>;
+		panel = <&dsi_g7a_37_02_0a_video &dsi_g7a_37_02_0b_video &dsi_g7a_36_02_0c_video>;
 	};
 };
 
@@ -223,6 +224,30 @@
 	};
 };
 
+&dsi_g7a_36_02_0c_video {
+		qcom,panel-supply-entries = <&dsi_panel_pwr_supply_avdd>;
+		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
+		qcom,mdss-dsi-bl-min-level = <2>;
+		qcom,mdss-dsi-bl-max-level = <4095>;
+		qcom,mdss-brightness-max-level = <4095>;
+		qcom,platform-reset-gpio = <&pm8150l_gpios 3 0>;
+
+		qcom,dsi-select-clocks = "mux_byte_clk0", "mux_pixel_clk0",
+			"src_byte_clk0", "src_pixel_clk0",
+			"shadow_byte_clk0", "shadow_pixel_clk0";
+
+		qcom,ulps-enabled;
+		qcom,mdss-dsi-display-timings {
+		timing@0 {
+			qcom,mdss-dsi-panel-phy-timings = [00 1A 06 06 22 20 07
+				06 04 02 04 00 16 16];
+			qcom,display-topology = <1 1 1>;
+			qcom,default-topology-index = <0>;
+		};
+	};
+
+};
+
 &dsi_g7a_42_02_0b_video {
 		qcom,panel-supply-entries = <&dsi_panel_pwr_supply_avdd>;
 		qcom,mdss-dsi-bl-pmic-control-type = "bl_ctrl_wled";
@@ -244,7 +269,9 @@
 			qcom,default-topology-index = <0>;
 		};
 	};
+
 };
+
 
 &dsi_sw43404_amoled_video {
 	/delete-property/ qcom,esd-check-enabled;
