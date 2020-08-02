@@ -402,7 +402,6 @@ static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 		chip->dynamic_fv_cfg_valid = false;
 	}
 
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	chip->dynamic_ffc_fv_cfg_valid = true;
 	rc = read_range_data_from_node(profile_node,
 			"qcom,dynamic-ffc-fv-ranges",
@@ -413,7 +412,6 @@ static int get_step_chg_jeita_setting_from_profile(struct step_chg_info *chip)
 					rc);
 		chip->dynamic_ffc_fv_cfg_valid = false;
 	}
-#endif
 
 	return rc;
 }
@@ -460,13 +458,11 @@ static void get_config_work(struct work_struct *work)
 			chip->dynamic_fv_config->fv_cfg[i].low_threshold,
 			chip->dynamic_fv_config->fv_cfg[i].high_threshold,
 			chip->dynamic_fv_config->fv_cfg[i].value);
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	for (i = 0; i < MAX_STEP_CHG_ENTRIES; i++)
 		pr_err("dynamic-ffc-fv-cfg: %d(count) ~ %d(coutn), %duV\n",
 			chip->dynamic_ffc_fv_config->fv_cfg[i].low_threshold,
 			chip->dynamic_ffc_fv_config->fv_cfg[i].high_threshold,
 			chip->dynamic_ffc_fv_config->fv_cfg[i].value);
-#endif
 
 	return;
 
@@ -522,6 +518,15 @@ static int get_val(struct range_data *range, int hysteresis, int current_index,
 		*new_index = (i - 1);
 		*val = range[*new_index].value;
 	}
+
+	if (threshold < range[0].low_threshold) {
+		*new_index = 0;
+		*val = range[*new_index].value;
+	} else if (threshold > range[MAX_STEP_CHG_ENTRIES - 1].low_threshold) {
+		*new_index = MAX_STEP_CHG_ENTRIES - 1;
+		*val = range[*new_index].value;
+	}
+
 
 	/*
 	 * If we don't have a current_index return this
@@ -613,7 +618,6 @@ static int handle_step_chg_config(struct step_chg_info *chip)
 	elapsed_us = ktime_us_delta(ktime_get(), chip->step_last_update_time);
 	/* skip processing, event too early */
 	if (elapsed_us < STEP_CHG_HYSTERISIS_DELAY_US)
-#ifdef  CONFIG_BQ2597X_CHARGE_PUMP
 	{
 		/*if usb is removing, do not skip*/
 		rc = power_supply_get_property(chip->usb_psy,
@@ -627,10 +631,6 @@ static int handle_step_chg_config(struct step_chg_info *chip)
 		if (!pval.intval)
 			return 0;
 	}
-#else
-		return 0;
-#endif
-
 
 	rc = power_supply_get_property(chip->batt_psy,
 		POWER_SUPPLY_PROP_STEP_CHARGING_ENABLED, &pval);
@@ -686,11 +686,9 @@ static int handle_step_chg_config(struct step_chg_info *chip)
 		chip->step_index = 0;
 	}
 
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	/* Do not drop step-chg index, if input supply is present */
 	fcc_ua = chip->step_chg_config->fcc_cfg[chip->step_index].value;
 	pr_info("batt_volt=%d, step_fcc_ua=%d\n", pval.intval, fcc_ua);
-#endif
 
 	if (!chip->fcc_votable)
 		chip->fcc_votable = find_votable("FCC");
@@ -737,7 +735,7 @@ static int handle_dynamic_fv(struct step_chg_info *chip)
 
 	elapsed_us = ktime_us_delta(ktime_get(), chip->dynamic_fv_last_update_time);
 	if (elapsed_us < STEP_CHG_HYSTERISIS_DELAY_US)
-		goto reschedule;
+		return 0;
 
 	rc = power_supply_get_property(chip->bms_psy,
 			POWER_SUPPLY_PROP_CYCLE_COUNT, &pval);
@@ -788,30 +786,27 @@ static int handle_dynamic_fv(struct step_chg_info *chip)
 update_time:
 	chip->dynamic_fv_last_update_time = ktime_get();
 	return 0;
-
-reschedule:
-	/* reschedule 1000uS after the remaining time */
-	return (STEP_CHG_HYSTERISIS_DELAY_US - elapsed_us + 1000);
 }
 
 #define JEITA_SUSPEND_HYST_UV		50000
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 #define BATT_COOL_THRESHOLD		150
 #define BATT_WARM_THRESHOLD		450
+#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 #define FFC_FLOAT_VOLTAGE_FOR_PM7150_CHG	4450000
 #define FFC_FLOAT_VOLTAGE_FOR_BMS		4470000
 #define FLOAT_VOLTAGE_NORMAL			4400000
-#define WARM_FLOAT_VOLTAGE			4100000
+#else
+#define FFC_FLOAT_VOLTAGE_FOR_PM7150_CHG	4480000
+#define FFC_FLOAT_VOLTAGE_FOR_BMS		4480000
+#define FLOAT_VOLTAGE_NORMAL			4450000
 #endif
+#define WARM_FLOAT_VOLTAGE			4100000
 static int handle_jeita(struct step_chg_info *chip)
 {
 	union power_supply_propval pval = {0, };
-	int rc = 0, fcc_ua = 0, fv_uv = 0, batt_temp = 0;
+	int rc = 0, fcc_ua = 0, fv_uv = 0, batt_temp = 0, charger_type = 0;
 	u64 elapsed_us;
-#ifdef  CONFIG_BQ2597X_CHARGE_PUMP
-	static bool fast_mode_dis;
-	int batt_soc = 0;
-#endif
+	int batt_soc = 0, fastcharge_mode = 0, pd_authentication = 0;
 
 	rc = power_supply_get_property(chip->batt_psy,
 		POWER_SUPPLY_PROP_SW_JEITA_ENABLED, &pval);
@@ -832,9 +827,7 @@ static int handle_jeita(struct step_chg_info *chip)
 
 	elapsed_us = ktime_us_delta(ktime_get(), chip->jeita_last_update_time);
 	/* skip processing, event too early */
-	if (elapsed_us < STEP_CHG_HYSTERISIS_DELAY_US)
-#ifdef  CONFIG_BQ2597X_CHARGE_PUMP
-	{
+	if (elapsed_us < STEP_CHG_HYSTERISIS_DELAY_US) {
 	/*if usb is removing, do not skip*/
 		rc = power_supply_get_property(chip->usb_psy,
 			POWER_SUPPLY_PROP_USB_IS_REMOVING, &pval);
@@ -847,9 +840,6 @@ static int handle_jeita(struct step_chg_info *chip)
 		if (!pval.intval)
 			return 0;
 	}
-#else
-		return 0;
-#endif
 
 	if (chip->jeita_fcc_config->param.use_bms)
 		rc = power_supply_get_property(chip->bms_psy,
@@ -892,7 +882,6 @@ static int handle_jeita(struct step_chg_info *chip)
 	if (rc < 0)
 		fv_uv = 0;
 
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	rc = power_supply_get_property(chip->bms_psy,
 				POWER_SUPPLY_PROP_CAPACITY, &pval);
 	if (rc < 0) {
@@ -900,16 +889,15 @@ static int handle_jeita(struct step_chg_info *chip)
 		return rc;
 	}
 	batt_soc = pval.intval;
-	pr_info("%s:batt_soc=%d\n", __func__, batt_soc);
 
 	rc = power_supply_get_property(chip->bms_psy,
 				POWER_SUPPLY_PROP_FASTCHARGE_MODE, &pval);
-	pr_err("%s:fastcharge_mode=%d\n", __func__, pval.intval);
 	if (rc < 0) {
 		pr_err("Couldn't read fastcharge mode fail rc=%d\n", rc);
 		return rc;
 	}
-	if (pval.intval) {
+	fastcharge_mode = pval.intval;
+	if (fastcharge_mode) {
 		fv_uv = FFC_FLOAT_VOLTAGE_FOR_PM7150_CHG;
 		if (batt_soc < 95)
 			pval.intval = FFC_FLOAT_VOLTAGE_FOR_BMS;
@@ -922,7 +910,6 @@ static int handle_jeita(struct step_chg_info *chip)
 		pr_err("Couldn't set FFC FLOAT VOLTAGE property for bms rc=%d\n", rc);
 		return rc;
 	}
-#endif
 
 	chip->fv_votable = find_votable("FV");
 	if (!chip->fv_votable)
@@ -934,16 +921,30 @@ static int handle_jeita(struct step_chg_info *chip)
 	if (!chip->usb_icl_votable)
 		goto set_jeita_fv;
 
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
+	rc = power_supply_get_property(chip->usb_psy, POWER_SUPPLY_PROP_REAL_TYPE, &pval);
+	if (rc < 0) {
+		pr_err("Get real charger type failed, rc = %d\n", rc);
+		return rc;
+	}
+	charger_type = pval.intval;
+
 	rc = power_supply_get_property(chip->usb_psy,
 				POWER_SUPPLY_PROP_PD_AUTHENTICATION, &pval);
 	if (rc < 0) {
 		pr_err("Get fastcharge mode status failed, rc=%d\n", rc);
 		return rc;
 	}
-	pr_err("pd_authentication=%d\n", pval.intval);
-	if (pval.intval) {
-		if ((batt_temp >= BATT_WARM_THRESHOLD || batt_temp <= BATT_COOL_THRESHOLD) && !fast_mode_dis) {
+	pd_authentication = pval.intval;
+
+	pr_err("pd_authentication = %d, charger_type = %d, batt_soc = %d, fascharge_mode = %d\n",
+			pd_authentication, charger_type, batt_soc, fastcharge_mode);
+
+#ifdef CONFIG_SMB1398_CHARGER
+	if (pd_authentication || charger_type == POWER_SUPPLY_TYPE_USB_HVDCP_3 || charger_type == POWER_SUPPLY_TYPE_USB_HVDCP_3P5) {
+#else
+	if (pd_authentication) {
+#endif
+		if ((batt_temp >= BATT_WARM_THRESHOLD || batt_temp <= BATT_COOL_THRESHOLD) && fastcharge_mode) {
 			pr_err("temp:%d disable fastcharge mode\n", batt_temp);
 			pval.intval = false;
 			rc = power_supply_set_property(chip->usb_psy,
@@ -952,10 +953,9 @@ static int handle_jeita(struct step_chg_info *chip)
 				pr_err("Set fastcharge mode failed, rc=%d\n", rc);
 				return rc;
 			}
-			fast_mode_dis = true;
 		} else if ((batt_temp < BATT_WARM_THRESHOLD - chip->jeita_fv_config->param.hysteresis) &&
 				(batt_temp > BATT_COOL_THRESHOLD + chip->jeita_fv_config->param.hysteresis) &&
-				fast_mode_dis) {
+				!fastcharge_mode) {
 			pr_err("temp:%d enable fastcharge mode\n", batt_temp);
 			pval.intval = true;
 			rc = power_supply_set_property(chip->usb_psy,
@@ -964,13 +964,8 @@ static int handle_jeita(struct step_chg_info *chip)
 				pr_err("Set fastcharge mode failed, rc=%d\n", rc);
 				return rc;
 			}
-			fast_mode_dis = false;
 		}
-	} else {
-		fast_mode_dis = false;
 	}
-
-#endif
 
 	/*
 	 * If JEITA float voltage is same as max-vfloat of battery then
@@ -988,7 +983,14 @@ static int handle_jeita(struct step_chg_info *chip)
 	 * JEITA VFLOAT threshold.
 	 */
 	/* if (chip->jeita_arb_en && fv_uv > 0) { */
-	if (fv_uv > 0 && pval.intval == POWER_SUPPLY_STATUS_CHARGING) {
+	rc = power_supply_get_property(chip->batt_psy,
+				POWER_SUPPLY_PROP_STATUS, &pval);
+	if (rc < 0) {
+		pr_err("Get battery status failed, rc = %d\n", rc);
+		goto set_jeita_fv;
+	}
+
+	if (fv_uv == WARM_FLOAT_VOLTAGE && pval.intval == POWER_SUPPLY_STATUS_CHARGING) {
 		rc = power_supply_get_property(chip->batt_psy,
 				POWER_SUPPLY_PROP_VOLTAGE_NOW, &pval);
 		if (!rc && (pval.intval > fv_uv))
@@ -1057,10 +1059,8 @@ static void status_change_work(struct work_struct *work)
 
 	handle_battery_insertion(chip);
 
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	if (!is_usb_available(chip))
 		goto exit_work;
-#endif
 
 	/* skip elapsed_us debounce for handling battery temperature */
 	rc = handle_jeita(chip);
@@ -1075,7 +1075,6 @@ static void status_change_work(struct work_struct *work)
 	if (rc < 0)
 		pr_err("Couldn't handle step rc = %d\n", rc);
 
-#ifdef  CONFIG_BQ2597X_CHARGE_PUMP
 	rc= power_supply_get_property(chip->usb_psy,
 			POWER_SUPPLY_PROP_USB_IS_REMOVING, &prop);
 	if (prop.intval) {
@@ -1083,7 +1082,6 @@ static void status_change_work(struct work_struct *work)
 		power_supply_set_property(chip->usb_psy,
 			POWER_SUPPLY_PROP_USB_IS_REMOVING, &prop);
 	}
-#endif
 
 	/* Remove stale votes on USB removal */
 	if (is_usb_available(chip)) {
@@ -1187,14 +1185,12 @@ int qcom_step_chg_init(struct device *dev,
 	if (!chip->jeita_fcc_config || !chip->jeita_fv_config || !chip->dynamic_fv_config)
 		return -ENOMEM;
 
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	chip->dynamic_ffc_fv_config =  devm_kzalloc(dev,
 			sizeof(struct dynamic_fv_cfg), GFP_KERNEL);
 
 	if (!chip->dynamic_ffc_fv_config)
 		return -ENOMEM;
 	chip->dynamic_ffc_fv_config->prop_name = "BATT_CYCLE_COUNT";
-#endif
 
 	chip->jeita_fcc_config->param.psy_prop = POWER_SUPPLY_PROP_TEMP;
 	chip->jeita_fcc_config->param.prop_name = "BATT_TEMP";

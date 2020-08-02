@@ -16,6 +16,7 @@ struct qg_batt_props {
 	int			float_volt_uv;
 	int			vbatt_full_mv;
 	int			fastchg_curr_ma;
+	int			cutoff_curr_ua;
 	int			qg_profile_version;
 	int			nom_cap_uah;
 };
@@ -178,9 +179,7 @@ struct qpnp_qg {
 	bool			force_soc;
 	bool			fvss_active;
 	bool			tcss_active;
-#ifdef CONFIG_BQ2597X_CHARGE_PUMP
 	bool			fastcharge_mode_enabled;
-#endif
 	bool			bass_active;
 	int			charge_status;
 	int			charge_type;

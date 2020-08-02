@@ -53,7 +53,7 @@ static ssize_t qg_ss_feature_store(struct device *dev,
 }
 DEVICE_ATTR_RW(qg_ss_feature);
 
-static int qg_delta_soc_interval_ms = 20000;
+static int qg_delta_soc_interval_ms = 40000;
 static ssize_t soc_interval_ms_show(struct device *dev, struct device_attribute
 				     *attr, char *buf)
 {
