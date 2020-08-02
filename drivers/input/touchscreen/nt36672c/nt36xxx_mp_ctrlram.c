@@ -86,6 +86,7 @@ static struct proc_dir_entry *NVT_proc_test_data_entry = NULL;
 #endif
 
 static int8_t nvt_mp_test_result_printed = 0;
+static uint8_t fw_ver = 0;
 
 extern void nvt_change_mode(uint8_t mode);
 extern uint8_t nvt_get_fw_pipe(void);
@@ -554,7 +555,7 @@ static int32_t nvt_polling_hand_shake_status(void)
 {
 	uint8_t buf[8] = {0};
 	int32_t i = 0;
-	const int32_t retry = 50;
+	const int32_t retry = 70;
 
 	for (i = 0; i < retry; i++) {
 		//---set xdata index to EVENT BUF ADDR---
@@ -1193,7 +1194,7 @@ static int32_t c_show_selftest(struct seq_file *m, void *v)
 {
 	NVT_LOG("++\n");
 
-	nvt_mp_seq_printf(m, "FW Version: %d\n\n", ts->fw_ver);
+	nvt_mp_seq_printf(m, "FW Version: %d\n\n", fw_ver);
 
 	nvt_mp_seq_printf(m, "Short Test");
 	if ((TestResult_Short == 0) || (TestResult_Short == 1)) {
@@ -1424,7 +1425,7 @@ int32_t parse_mp_criteria_item_array(char **ptr, const char *item_string, int32_
 		printk("\n");
 		// check if j equals to X_Channel
 		if (j != X_Channel) {
-			NVT_ERR("j not equal X_Channel!, j=%d, X_Channel=%d\n", j, X_Channel);
+			NVT_ERR("%s :j not equal X_Channel!, j=%d, X_Channel=%d\n", item_string, j, X_Channel);
 			return -1;
 		}
 		// go forward
@@ -1697,7 +1698,7 @@ static int32_t nvt_selftest_open(struct inode *inode, struct file *file)
 		NVT_ERR("get fw info failed!\n");
 		return -EAGAIN;
 	}
-
+	fw_ver = ts->fw_ver;
 #if NVT_TOUCH_MP_SETTING_CRITERIA_FROM_CSV
 	//---Check if MP Setting Criteria CSV file exist and load---
 	snprintf(mp_setting_criteria_csv_filename, PAGE_SIZE, "NT36xxx_MP_Setting_Criteria_%04X.csv", ts->nvt_pid);
@@ -2105,7 +2106,7 @@ static int nvt_short_test(void)
 		NVT_ERR("get fw info failed!\n");
 		return -EAGAIN;
 	}
-
+	fw_ver = ts->fw_ver;
 #if NVT_TOUCH_MP_SETTING_CRITERIA_FROM_CSV
 	//---Check if MP Setting Criteria CSV file exist and load---
 	snprintf(mp_setting_criteria_csv_filename, PAGE_SIZE, "NT36xxx_MP_Setting_Criteria_%04X.csv", ts->nvt_pid);
@@ -2227,7 +2228,7 @@ static int nvt_open_test(void)
 		NVT_ERR("get fw info failed!\n");
 		return -EAGAIN;
 	}
-
+	fw_ver = ts->fw_ver;
 #if NVT_TOUCH_MP_SETTING_CRITERIA_FROM_CSV
 	//---Check if MP Setting Criteria CSV file exist and load---
 	snprintf(mp_setting_criteria_csv_filename, PAGE_SIZE, "NT36xxx_MP_Setting_Criteria_%04X.csv", ts->nvt_pid);
