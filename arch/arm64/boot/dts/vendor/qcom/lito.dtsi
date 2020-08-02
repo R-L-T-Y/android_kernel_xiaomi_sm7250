@@ -29,8 +29,8 @@
 
 	mem-offline {
 		compatible = "qcom,mem-offline";
-		offline-sizes = <0x1 0x40000000 0x0 0x80000000>,
-				<0x1 0xc0000000 0x0 0xc0000000>,
+		offline-sizes = <0x1 0x40000000 0x0 0x40000000>,
+				<0x1 0xc0000000 0x0 0x80000000>,
 				<0x2 0xc0000000 0x1 0x40000000>;
 		granule = <512>;
 		mboxes = <&qmp_aop 0>;
@@ -525,6 +525,11 @@
 		dfps_data_memory: dfps_data_region@a2300000 {
 			reg = <0x0 0xa2300000 0x0 0x0100000>;
 			label = "dfps_data_region";
+		};
+
+		disp_rdump_memory: disp_rdump_region@0xa0000000 {
+			reg = <0x0 0xA0000000 0x0 0x02300000>;
+			label = "disp_rdump_region";
 		};
 
 		dump_mem: mem_dump_region {
