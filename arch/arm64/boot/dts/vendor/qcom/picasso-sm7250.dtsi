@@ -148,7 +148,7 @@
 			novatek,swrst-n8-addr = <0x03F0FE>;
 			novatek,spi-rd-fast-addr = <0x03F310>;
 
-			novatek,config-array-size = <2>;
+			novatek,config-array-size = <3>;
 			novatek,cfg_0 {
 				novatek,tp-vendor = <0x41>;
 				novatek,display-maker = <0x37>;
@@ -165,6 +165,15 @@
 				novatek,mp-name = "novatek_nt36672c_g7a_mp02.bin";
 				novatek,clicknum-file-name = "nvt+ebbg";
 			};
+			novatek,cfg_2 {
+				novatek,tp-vendor = <0x46>;
+				novatek,display-maker = <0x36>;
+				novatek,glass-vendor = <0x00>;
+				novatek,fw-name = "novatek_nt36672c_g7a_fw03.bin";
+				novatek,mp-name = "novatek_nt36672c_g7a_mp03.bin";
+				novatek,clicknum-file-name = "nvt+ebbg";
+			};
+
 			/* MP */
 			//novatek,mp-support-dt;
 
