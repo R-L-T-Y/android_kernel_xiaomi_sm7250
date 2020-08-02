@@ -52,6 +52,8 @@
 #define MI_DRM_NOTIFIER
 
 #define NVT_DEBUG 1
+#define TOUCH_DISABLE_LPM 1
+#define TOUCH_IRQ_BOOST 2
 
 //---GPIO number---
 #define NVTTOUCH_RST_PIN 980
@@ -214,6 +216,7 @@ struct nvt_ts_data {
 	struct completion dev_pm_suspend_completion;
 	bool palm_sensor_changed;
 	bool palm_sensor_switch;
+	uint8_t debug_flag;
 };
 
 #if NVT_TOUCH_PROC

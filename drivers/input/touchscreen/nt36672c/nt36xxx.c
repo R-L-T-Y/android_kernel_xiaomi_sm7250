@@ -90,10 +90,11 @@ static int32_t nvt_ts_resume(struct device *dev);
 extern int dsi_panel_lockdown_info_read(unsigned char *plockdowninfo);
 extern void dsi_panel_doubleclick_enable(bool on);
 static int32_t nvt_check_palm(uint8_t input_id, uint8_t *data);
-
+extern void touch_irq_boost(void);
+extern void lpm_disable_for_input(bool on);
 uint32_t ENG_RST_ADDR  = 0x7FFF80;
-uint32_t SWRST_N8_ADDR = 0;
-uint32_t SPI_RD_FAST_ADDR = 0;
+uint32_t SWRST_N8_ADDR = 0; //read from dtsi
+uint32_t SPI_RD_FAST_ADDR = 0;	//read from dtsi
 
 #if TOUCH_KEY_NUM > 0
 const uint16_t touch_key_array[TOUCH_KEY_NUM] = {
@@ -291,10 +292,8 @@ int32_t CTP_SPI_WRITE(struct spi_device *client, uint8_t *buf, uint16_t len)
 {
 	int32_t ret = -1;
 	int32_t retries = 0;
-
 	mutex_lock(&ts->xbuf_lock);
 	buf[0] = SPI_WRITE_MASK(buf[0]);
-
 	while (retries < 5) {
 		ret = spi_read_write(client, buf, len, NVTWRITE);
 		if (ret == 0)	break;
@@ -305,7 +304,6 @@ int32_t CTP_SPI_WRITE(struct spi_device *client, uint8_t *buf, uint16_t len)
 		NVT_ERR("error, ret=%d\n", ret);
 		ret = -EIO;
 	}
-
 	mutex_unlock(&ts->xbuf_lock);
 
 	return ret;
@@ -905,7 +903,7 @@ return:
 *******************************************************/
 static int32_t nvt_flash_proc_init(void)
 {
-	NVT_proc_entry = proc_create(DEVICE_NAME, 0444, NULL, &nvt_flash_fops);
+	NVT_proc_entry = proc_create(DEVICE_NAME, 0444, NULL,&nvt_flash_fops);
 	if (NVT_proc_entry == NULL) {
 		NVT_ERR("Failed!\n");
 		return -ENOMEM;
@@ -1186,10 +1184,14 @@ static int nvt_get_panel_type(struct nvt_ts_data *ts_data)
 	struct nvt_config_info *panel_list = ts->config_array;
 
 	for (i = 0; i < ts->config_array_size; i++) {
-		if (lockdown[7] == panel_list[i].glass_vendor) {
-			NVT_LOG("match panle type, fw is [%s], mp is [%s]",
-				panel_list[i].nvt_fw_name, panel_list[i].nvt_mp_name);
-			break;
+
+		if (lockdown[0] == panel_list[i].tp_vendor) {
+			if(lockdown[0] == 0x46) {
+				break;
+			}
+			if (lockdown[7] == panel_list[i].glass_vendor) {
+				break;
+			}
 		}
 	}
 
@@ -1198,7 +1200,11 @@ static int nvt_get_panel_type(struct nvt_ts_data *ts_data)
 	if (i >= ts->config_array_size) {
 		NVT_ERR("mismatch panel type, use default fw");
 		ts->panel_index = -EINVAL;
+		return ts->panel_index;
 	}
+
+	NVT_LOG("match panle type, fw is [%s], mp is [%s]",
+		panel_list[i].nvt_fw_name, panel_list[i].nvt_mp_name);
 
 	return ts->panel_index;
 }
@@ -1412,12 +1418,17 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		pm_wakeup_event(&ts->input_dev->dev, 5000);
 	}
 #endif
+	if (ts->debug_flag == TOUCH_IRQ_BOOST)
+		touch_irq_boost();
 	mutex_lock(&ts->lock);
-
+	if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+		lpm_disable_for_input(true);
 	if (ts->dev_pm_suspend) {
 		ret = wait_for_completion_timeout(&ts->dev_pm_suspend_completion, msecs_to_jiffies(500));
 		if (!ret) {
 			NVT_ERR("system(spi) can't finished resuming procedure, skip it\n");
+			if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+				lpm_disable_for_input(false);
 			goto XFER_ERROR;
 		}
 	}
@@ -1425,6 +1436,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	ret = CTP_SPI_READ(ts->client, point_data, POINT_DATA_LEN + 1);
 	if (ret < 0) {
 		NVT_ERR("CTP_SPI_READ failed.(%d)\n", ret);
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR;
 	}
 /*
@@ -1448,6 +1461,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 		} else {
 			nvt_update_firmware(ts->fw_name);
 		}
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR;
    }
 #endif /* #if NVT_TOUCH_WDT_RECOVERY */
@@ -1456,6 +1471,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	/* ESD protect by FW handshake */
 	if (nvt_fw_recovery(point_data)) {
 		nvt_esd_check_enable(true);
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR;
 	}
 #endif /* #if NVT_TOUCH_ESD_PROTECT */
@@ -1464,6 +1481,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	input_id = (uint8_t)(point_data[1] >> 3);
 
 	if (nvt_check_palm(input_id, point_data)) {
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		goto XFER_ERROR; /* to skip point data parsing */
 	}
 #endif
@@ -1472,6 +1491,8 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	if (bTouchIsAwake == 0) {
 		input_id = (uint8_t)(point_data[1] >> 3);
 		nvt_ts_wakeup_gesture_report(input_id, point_data);
+		if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+			lpm_disable_for_input(false);
 		mutex_unlock(&ts->lock);
 		return IRQ_HANDLED;
 	}
@@ -1514,6 +1535,7 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			input_mt_slot(ts->input_dev, input_id - 1);
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, true);
 			input_report_key(ts->input_dev, BTN_TOUCH, 1);
+			input_report_key(ts->input_dev, BTN_TOOL_FINGER, 1);
 #else /* MT_PROTOCOL_B */
 			input_report_abs(ts->input_dev, ABS_MT_TRACKING_ID, input_id - 1);
 			input_report_key(ts->input_dev, BTN_TOUCH, 1);
@@ -1541,8 +1563,12 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 			input_report_abs(ts->input_dev, ABS_MT_TOUCH_MAJOR, 0);
 			input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, false);
 			//input_report_abs(ts->input_dev, ABS_MT_PRESSURE, 0);
-			if (finger_cnt == 0 && test_bit(i, ts->slot_map))
+			if (finger_cnt == 0 && test_bit(i, ts->slot_map)) {
 				input_report_key(ts->input_dev, BTN_TOUCH, 0);
+				input_report_key(ts->input_dev, BTN_TOOL_FINGER, 0);
+				if (ts->debug_flag >= TOUCH_DISABLE_LPM)
+					lpm_disable_for_input(false);
+			}
 			clear_bit(i, ts->slot_map);
 		}
 	}
@@ -1573,7 +1599,6 @@ static irqreturn_t nvt_ts_work_func(int irq, void *data)
 	input_sync(ts->input_dev);
 
 XFER_ERROR:
-
 	mutex_unlock(&ts->lock);
 
 	return IRQ_HANDLED;
@@ -2201,6 +2226,39 @@ static int tpdbg_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
+static ssize_t  nvt_touch_test_write(struct file *file, const char __user *buf,
+		size_t count, loff_t *pos){
+	int retval = -1;
+	uint8_t cmd[8];
+	if (copy_from_user(cmd, buf, count)) {
+		retval = -EFAULT;
+		goto out;
+	}
+	switch(cmd[0]) {
+		case '0':
+			ts->debug_flag = 0;
+			break;
+		case '1':
+			ts->debug_flag = 1;
+			break;
+		case '2':
+			ts->debug_flag = 2;
+			break;
+		default:
+			NVT_LOG("%s invalid input cmd, set default value\n", __func__);
+			ts->debug_flag = 2;
+	}
+	NVT_LOG("%s set touch boost debug flag to %d\n", __func__, ts->debug_flag);
+	retval = count;
+out:
+	return retval;
+}
+
+static const struct file_operations nvt_touch_test_fops = {
+	.owner = THIS_MODULE,
+	.write = nvt_touch_test_write,
+};
+
 static const struct file_operations tpdbg_ops = {
 	.owner = THIS_MODULE,
 	.open = tpdbg_open,
@@ -2322,6 +2380,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->client->bits_per_word = 8;
 	ts->client->mode = SPI_MODE_0;
 	ts->client->max_speed_hz = ts->spi_max_freq;
+	ts->debug_flag = 2;
 
 	ret = spi_setup(ts->client);
 	if (ret < 0) {
@@ -2409,7 +2468,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 
 	//---set input device info.---
 	ts->input_dev->evbit[0] = BIT_MASK(EV_SYN) | BIT_MASK(EV_KEY) | BIT_MASK(EV_ABS) ;
-	ts->input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH);
+	ts->input_dev->keybit[BIT_WORD(BTN_TOUCH)] = BIT_MASK(BTN_TOUCH | BTN_TOOL_FINGER);
 	ts->input_dev->propbit[0] = BIT(INPUT_PROP_DIRECT);
 
 #if MT_PROTOCOL_B
@@ -2599,6 +2658,7 @@ static int32_t nvt_ts_probe(struct platform_device *pdev)
 	ts->debugfs = debugfs_create_dir("tp_debug", NULL);
 	if (ts->debugfs) {
 		debugfs_create_file("switch_state", 0660, ts->debugfs, ts, &tpdbg_ops);
+		debugfs_create_file("touch_boost", 0660, ts->debugfs, ts, &nvt_touch_test_fops);
 	}
 #endif
 #ifdef CONFIG_TOUCHSCREEN_XIAOMI_TOUCHFEATURE
@@ -2868,7 +2928,7 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		ts->palm_sensor_changed = true;
 	}
 #endif
-
+	mdelay(10);
 	if (ts->db_wakeup) {
 		//---write command to enter "wakeup gesture mode"---
 		buf[0] = EVENT_MAP_HOST_CMD;
@@ -2895,7 +2955,7 @@ static int32_t nvt_ts_suspend(struct device *dev)
 			NVT_ERR("Failed to init pinctrl\n");
 		}
 	}
-
+	mdelay(10);
 	mutex_unlock(&ts->lock);
 	/* release all touches */
 #if MT_PROTOCOL_B
@@ -2906,6 +2966,7 @@ static int32_t nvt_ts_suspend(struct device *dev)
 		input_mt_report_slot_state(ts->input_dev, MT_TOOL_FINGER, 0);
 	}
 #endif
+	input_report_key(ts->input_dev, BTN_TOOL_FINGER, 0);
 	input_report_key(ts->input_dev, BTN_TOUCH, 0);
 #if !MT_PROTOCOL_B
 	input_mt_sync(ts->input_dev);
