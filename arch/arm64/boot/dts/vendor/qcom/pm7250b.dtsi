@@ -384,6 +384,7 @@
 				label = "smb1390_therm";
 				qcom,hw-settle-time = <200>;
 				qcom,pre-scaling = <1 1>;
+				qcom,scale-fn-type = <15>;
 			};
 
 			chg_sbux@99 {

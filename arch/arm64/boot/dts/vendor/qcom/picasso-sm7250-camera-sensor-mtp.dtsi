@@ -196,13 +196,9 @@
 		cam_vaf-supply = <&L16A>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
-		pwm-switch;
 		rgltr-min-voltage = <2800000>;
 		rgltr-max-voltage = <2800000>;
 		rgltr-load-current = <100000>;
-		gpio-no-mux = <0>;
-		sensor-mode = <0>;
-		cci-device = <1>;
 		cci-master = <1>;
 		status = "ok";
 	};
@@ -571,13 +567,9 @@
 		cam_vaf-supply = <&L16A>;
 		regulator-names = "cam_vaf";
 		rgltr-cntrl-support;
-		pwm-switch;
 		rgltr-min-voltage = <2800000>;
 		rgltr-max-voltage = <2800000>;
 		rgltr-load-current = <100000>;
-		gpio-no-mux = <0>;
-		sensor-mode = <0>;
-		cci-device = <0>;
 		cci-master = <0>;
 		status = "ok";
 	};

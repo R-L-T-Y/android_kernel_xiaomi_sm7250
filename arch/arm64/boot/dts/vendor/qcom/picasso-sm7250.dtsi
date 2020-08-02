@@ -595,6 +595,10 @@
 	};
 };
 
+&L1C {
+	qcom,init-voltage = <1896000>;
+};
+
 &dsi_panel_pwr_supply_avdd {
 	qcom,panel-supply-entry@0 {
 		qcom,supply-min-voltage = <1896000>;
@@ -969,4 +973,8 @@
 
 &sdhc_2 {
 	status = "disabled";
+};
+
+&pm8008_8 {
+	pinctrl-0 = <&pm8008_active>; //liuqinhong@xiaomi.com
 };

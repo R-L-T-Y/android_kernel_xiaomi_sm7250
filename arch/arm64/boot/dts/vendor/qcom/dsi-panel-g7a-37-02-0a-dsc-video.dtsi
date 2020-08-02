@@ -53,9 +53,6 @@
 			17000 15500 30000 8000 3000>;
 		qcom,mdss-dsi-panel-peak-brightness = <4200000>;
 		qcom,mdss-dsi-panel-blackness-level = <3230>;
-		qcom,mdss-dsi-panel-xy-coordinate = <0x0F 0x18>;
-		qcom,mdss-dsi-panel-max-luminance = <0x0F 0x20>;
-		qcom,mdss-dsi-panel-max-luminance-valid = <0x01 0x01>;
 		/* qcom,mdss-dsi-qsync-min-refresh-rate = <60>; */
 
 		qcom,mdss-dsi-pan-enable-dynamic-fps;
@@ -230,6 +227,10 @@
 						15 00 00 00 00 00 02 65 B2
 						15 00 00 00 00 00 02 66 B2
 						15 01 00 00 00 00 02 67 B2
+						15 00 00 00 00 00 02 FF C0
+						15 00 00 00 00 00 02 FB 01
+						15 00 00 00 00 00 02 9C 11
+						15 01 00 00 00 00 02 9D 11
 						15 01 00 00 00 00 02 FF 10
 						15 00 00 00 00 00 02 FB 01
 						39 00 00 00 00 00 03 51 0B 6C
@@ -291,6 +292,7 @@
 	mi,mdss-panel-on-dimming-delay = <120>;
 	mi,esd-err-irq-gpio = <&tlmm 55 0x2002>; /* trig-flags: falling-0x0002 rasing-0x0001*/
 	mi,mdss-dsi-panel-xy-coordinate = <0x6 0x18>;
+	mi,mdss-dsi-panel-max-luminance = <0x6 0x4>;
 
 	qcom,mdss-dsi-display-timings {
 		timing@0{
@@ -330,6 +332,13 @@
 				15 01 00 00 00 00 02 FF 10
 				06 01 00 00 00 00 01 A1];
 			mi,mdss-dsi-xy-coordinate-command-state = "dsi_lp_mode";
+
+			mi,mdss-dsi-max-luminance-write-command = [
+				15 01 00 00 00 00 02 FF 10];
+			mi,mdss-dsi-max-luminance-write-command-state = "dsi_lp_mode";
+			mi,mdss-dsi-max-luminance-read-command = [
+				06 01 00 00 00 00 01 A1];
+			mi,mdss-dsi-max-luminance-read-command-state = "dsi_lp_mode";
 		};
 	};
 };
