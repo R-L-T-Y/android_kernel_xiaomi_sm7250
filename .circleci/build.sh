@@ -55,10 +55,10 @@ printf "/n/n/n/n" | make -j$(nproc --all) O=out \
 			     CC=clang \
 			     CROSS_COMPILE=aarch64-linux-gnu- \
 			     CROSS_COMPILE_ARM32=arm-linux-gnueabi-
-   cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
-   python2 "libufdt/utils/src/mkdtboimg.py" \
-					create "out/arch/arm64/boot/dtbo.img" --page_size=4096 out/arch/arm64/boot/dts/qcom/*.dtbo
-   cp out/arch/arm64/boot/dtbo.img AnyKernel
+   cp out/arch/arm64/boot/Image.gz AnyKernel
+//   python2 "libufdt/utils/src/mkdtboimg.py" \
+//					create "out/arch/arm64/boot/dtbo.img" --page_size=4096 out/arch/arm64/boot/dts/qcom/*.dtbo
+//   cp out/arch/arm64/boot/dtbo.img AnyKernel
 }
 # Zipping
 function zipping() {
