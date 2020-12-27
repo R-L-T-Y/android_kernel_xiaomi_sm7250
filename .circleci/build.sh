@@ -6,7 +6,7 @@ git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
 git clone --depth=1 https://github.com/Forenche/AnyKernel3 -b picasso AnyKernel
 git clone --depth=1 https://android.googlesource.com/platform/system/libufdt libufdt
 echo "Done"
-IMAGE=$(pwd)/out/arch/arm64/boot/Image
+IMAGE=$(pwd)/out/arch/arm64/boot/Image.gz-dtb
 TANGGAL=$(date +"%F-%S")
 START=$(date +"%s")
 export CONFIG_PATH=$PWD/arch/arm64/configs/picasso_user_defconfig
@@ -56,7 +56,7 @@ printf "/n/n/n/n" | make -j$(nproc --all) O=out \
 			     CROSS_COMPILE=aarch64-linux-gnu- \
 			     CROSS_COMPILE_ARM32=arm-linux-gnueabi-
    ls out/arch/arm64/boot/
-   cp out/arch/arm64/boot/Image AnyKernel
+   cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
 }
 # Zipping
 function zipping() {
