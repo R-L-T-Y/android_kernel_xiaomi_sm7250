@@ -57,6 +57,10 @@ printf "/n/n/n/n" | make -j$(nproc --all) O=out \
 			     CROSS_COMPILE_ARM32=arm-linux-gnueabi-
    ls out/arch/arm64/boot/
    cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
+   rm Anykernel/dtbo.img
+   python2 "libufdt/utils/src/mkdtboimg.py" \
+					create "out/arch/arm64/boot/dtbo.img" --page_size=4096 out/arch/arm64/boot/dts/qcom/*.dtbo
+   cp out/arch/arm64/boot/dtbo.img AnyKernel
 }
 # Zipping
 function zipping() {
