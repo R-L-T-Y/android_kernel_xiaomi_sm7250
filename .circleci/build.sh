@@ -28,7 +28,7 @@ function sendinfo() {
 }
 # Push kernel to channel
 function push() {
-    cd AnyKernel
+    cd AnyKernel3
     ZIP=$(echo *.zip)
     curl -F document=@$ZIP "https://api.telegram.org/bot$token/sendDocument" \
         -F chat_id="$chat_id" \
@@ -55,12 +55,12 @@ printf "/n/n/n/n" | make -j$(nproc --all) O=out \
 			     CROSS_COMPILE=aarch64-linux-gnu- \
 			     CROSS_COMPILE_ARM32=arm-linux-gnueabi-
    ls out/arch/arm64/boot/
-   cp out/arch/arm64/boot/Image.gz-dtb AnyKernel
-   cp out/arch/arm64/boot/dtbo.img AnyKernel
+   cp out/arch/arm64/boot/Image.gz-dtb AnyKernel3
+   cp out/arch/arm64/boot/dtbo.img AnyKernel3
 }
 # Zipping
 function zipping() {
-    cd AnyKernel || exit 1
+    cd AnyKernel3 || exit 1
     zip -r9 picasso-${TANGGAL}.zip *
     cd .. 
 }
