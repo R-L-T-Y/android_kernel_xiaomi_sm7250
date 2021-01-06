@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 echo "Cloning dependencies"
-git clone --depth=1 https://github.com/Area42-Labs/kramel_picasso -b  picasso-q-oss  kernel
-cd kernel
 git clone --depth=1 https://github.com/kdrag0n/proton-clang clang
 git clone --depth=1 https://github.com/Forenche/AnyKernel3 -b picasso AnyKernel
 git clone --depth=1 https://android.googlesource.com/platform/system/libufdt libufdt
@@ -74,3 +72,4 @@ zipping
 END=$(date +"%s")
 DIFF=$(($END - $START))
 push
+echo $(curl --upload-file  $ZIP https://transfer.sh/)
